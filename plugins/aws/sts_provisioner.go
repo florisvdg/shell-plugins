@@ -55,7 +55,7 @@ func (p STSProvisioner) Provision(ctx context.Context, in sdk.ProvisionInput, ou
 		return
 	}
 
-	awsConfig, err := getAWSAuthConfigurationForProfile(profile)
+	awsConfig, err := ExecuteSilently(getAWSAuthConfigurationForProfile)(profile)
 	if err != nil {
 		out.AddError(err)
 		return
@@ -180,18 +180,10 @@ func (m CacheProviderFactory) NewAccessKeysProvider() aws.CredentialsProvider {
 	return accessKeysProvider{itemFields: m.ItemFields}
 }
 
-func ExecuteSilently[G interface{}, e error](f func() (G, e)) func() (G, e) {
-	return func() (G, e) {
-		log.SetOutput(io.Discard)
-		defer log.SetOutput(os.Stderr)
-		return f()
-	}
-}
-
 // getAWSAuthConfigurationForProfile loads specified configurations from both config file and environment
 func getAWSAuthConfigurationForProfile(profile string) (*confighelpers.Config, error) {
 	// Read config file from the location set in AWS_CONFIG_FILE env var or from  ~/.aws/config
-	configFile, err := ExecuteSilently(confighelpers.LoadConfigFromEnv)()
+	configFile, err := confighelpers.LoadConfigFromEnv()
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +256,7 @@ type assumeRoleProvider struct {
 }
 
 func (p assumeRoleProvider) Retrieve(ctx context.Context) (aws.Credentials, error) {
-	credentials, err := p.AssumeRoleProvider.Retrieve(ctx)
+	credentials, err := ExecuteSilently(p.AssumeRoleProvider.Retrieve)(ctx)
 	if err != nil {
 		return aws.Credentials{}, err
 	}
@@ -304,7 +296,7 @@ type mfaSessionTokenProvider struct {
 }
 
 func (p mfaSessionTokenProvider) Retrieve(ctx context.Context) (aws.Credentials, error) {
-	credentials, err := p.SessionTokenProvider.Retrieve(ctx)
+	credentials, err := ExecuteSilently(p.SessionTokenProvider.Retrieve)(ctx)
 	if err != nil {
 		return aws.Credentials{}, err
 	}
@@ -364,4 +356,12 @@ func getSTSClient(region string, credsProvider aws.CredentialsProvider) *sts.Cli
 		Credentials: credsProvider,
 	}
 	return sts.NewFromConfig(clientConfig)
+}
+
+func ExecuteSilently[input interface{}, output interface{}, e error](f func(input) (output, e)) func(input) (output, e) {
+	return func(i input) (output, e) {
+		log.SetOutput(io.Discard)
+		defer log.SetOutput(os.Stderr)
+		return f(i)
+	}
 }
