@@ -74,7 +74,7 @@ func (p STSProvisioner) Provision(ctx context.Context, in sdk.ProvisionInput, ou
 		return
 	}
 
-	tempCredentials, err := tempCredentialsProvider.Retrieve(ctx)
+	tempCredentials, err := ExecuteSilently(tempCredentialsProvider.Retrieve)(ctx)
 	if err != nil {
 		out.AddError(err)
 		return
@@ -256,7 +256,7 @@ type assumeRoleProvider struct {
 }
 
 func (p assumeRoleProvider) Retrieve(ctx context.Context) (aws.Credentials, error) {
-	credentials, err := ExecuteSilently(p.AssumeRoleProvider.Retrieve)(ctx)
+	credentials, err := p.AssumeRoleProvider.Retrieve(ctx)
 	if err != nil {
 		return aws.Credentials{}, err
 	}
@@ -296,7 +296,7 @@ type mfaSessionTokenProvider struct {
 }
 
 func (p mfaSessionTokenProvider) Retrieve(ctx context.Context) (aws.Credentials, error) {
-	credentials, err := ExecuteSilently(p.SessionTokenProvider.Retrieve)(ctx)
+	credentials, err := p.SessionTokenProvider.Retrieve(ctx)
 	if err != nil {
 		return aws.Credentials{}, err
 	}
